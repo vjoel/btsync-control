@@ -1,0 +1,82 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		btsync
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		
+# Short-Description:	BitTorrent Sync daemon for multiple users
+### END INIT INFO
+
+# based on https://gist.github.com/MendelGusmao/5398362/
+#
+# set up each user's ~user/.sync/config.json using
+#   btsync --dump-sample-config
+# set the storage_path to ~user/.sync
+# edit the webui port, login, and password OR set the shared_folders
+# install this script in /etc/init.d, chmod +x, and run:
+#   update-rc.d btsync defaults
+#   service btsync start
+
+set -e
+
+BTSYNC_USERS="btsync"
+DAEMON=/usr/local/bin/btsync
+
+start() {
+  for btsuser in $BTSYNC_USERS; do
+    HOMEDIR=`getent passwd $btsuser | cut -d: -f6`
+    config=$HOMEDIR/.sync/config.json
+    if [ -f $config ]; then
+      echo "Starting btsync for $btsuser"
+      start-stop-daemon -o -c $btsuser -S -u $btsuser -x $DAEMON -- --config $config
+    else
+      echo "Couldn't start btsync for $btsuser (no $config found)"
+    fi
+  done
+}
+ 
+stop() {
+  for btsuser in $BTSYNC_USERS; do
+    dbpid=`pgrep -f -u $btsuser ^$DAEMON || true`
+    if [ ! -z "$dbpid" ]; then
+      echo "Stopping btsync for $btsuser"
+      start-stop-daemon -o -c $btsuser -K -R2 -u $btsuser -x $DAEMON
+    else
+      echo "btsync for $btsuser: not running."
+    fi
+  done
+}
+ 
+status() {
+  for btsuser in $BTSYNC_USERS; do
+    dbpid=`pgrep -f -u $btsuser ^$DAEMON || true`
+    if [ -z "$dbpid" ]; then
+      echo "btsync for $btsuser: not running."
+    else
+      echo "btsync for $btsuser: running (pid $dbpid)"
+    fi
+  done
+}
+ 
+case "$1" in
+start)
+  start
+  ;;
+stop)
+  stop
+  ;;
+restart|reload|force-reload)
+  stop
+  start
+  ;;
+status)
+  status
+  ;;
+*)
+  echo "Usage: /etc/init.d/btsync {start|stop|reload|force-reload|restart|status}"
+  exit 1
+esac
+ 
+exit 0
