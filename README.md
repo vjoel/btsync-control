@@ -1,4 +1,4 @@
 btsync-control
 ==============
 
-init script to control btsync saemon
+init script to control btsync daemon
